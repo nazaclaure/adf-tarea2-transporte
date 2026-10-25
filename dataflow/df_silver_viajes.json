@@ -1,16 +1,109 @@
 {
-	"name": "dataflow1",
+	"name": "df_silver_viajes",
 	"properties": {
 		"folder": {
 			"name": "silver"
 		},
 		"type": "MappingDataFlow",
 		"typeProperties": {
-			"sources": [],
-			"sinks": [],
-			"transformations": [],
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_viajes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_viajes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "silverViajes"
+				}
+			],
+			"transformations": [
+				{
+					"name": "convertirTipos"
+				},
+				{
+					"name": "normalizarIds"
+				},
+				{
+					"name": "numerarDuplicados"
+				},
+				{
+					"name": "filtrarUnico"
+				}
+			],
 			"scriptLines": [
-				""
+				"source(output(",
+				"          AnioFuente as string,",
+				"          ViajeId as string,",
+				"          RutaHistoricaId as string,",
+				"          VehiculoId as string,",
+				"          FechaServicio as string,",
+				"          HoraProgramada as string,",
+				"          HoraSalida as string,",
+				"          HoraLlegada as string,",
+				"          ValidacionesTarjeta as string,",
+				"          KmRecorridos as string,",
+				"          EstadoViaje as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source1 derive(FechaServicio = iif(isNull(FechaServicio)||trim(FechaServicio)=='', toDate(null()), iif(instr(FechaServicio,'/')>0, toDate(trim(FechaServicio),'dd/MM/yyyy'), iif(instr(FechaServicio,'-')>0, toDate(substring(trim(FechaServicio),1,10),'yyyy-MM-dd'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(trim(FechaServicio)))))),",
+				"          HoraProgramada = toTimestamp(concat('1900-01-01 ', substring(iif(instr(HoraProgramada,'T')>0, substring(HoraProgramada, instr(HoraProgramada,'T')+1), iif(instr(HoraProgramada,' ')>0, substring(HoraProgramada, instr(HoraProgramada,' ')+1), trim(HoraProgramada))),1,5), ':00'), 'yyyy-MM-dd HH:mm:ss'),",
+				"          HoraSalida = toTimestamp(concat('1900-01-01 ', substring(iif(instr(HoraSalida,'T')>0, substring(HoraSalida, instr(HoraSalida,'T')+1), iif(instr(HoraSalida,' ')>0, substring(HoraSalida, instr(HoraSalida,' ')+1), trim(HoraSalida))),1,5), ':00'), 'yyyy-MM-dd HH:mm:ss'),",
+				"          HoraLlegada = toTimestamp(concat('1900-01-01 ', substring(iif(instr(HoraLlegada,'T')>0, substring(HoraLlegada, instr(HoraLlegada,'T')+1), iif(instr(HoraLlegada,' ')>0, substring(HoraLlegada, instr(HoraLlegada,' ')+1), trim(HoraLlegada))),1,5), ':00'), 'yyyy-MM-dd HH:mm:ss'),",
+				"          ValidacionesTarjeta = toInteger(trim(ValidacionesTarjeta)),",
+				"          KmRecorridos = toDecimal(round(toDouble(replace(trim(KmRecorridos),',','.')),1),8,1),",
+				"          EstadoViaje = upper(trim(EstadoViaje))) ~> convertirTipos",
+				"convertirTipos derive(ViajeId = iif(left(upper(trim(ViajeId)),3)=='VJ-', upper(trim(ViajeId)), concat('VJ-', toString(year(FechaServicio)), '-', lpad(trim(ViajeId),5,'0'))),",
+				"          RutaHistoricaId = iif(upper(trim(RutaHistoricaId))=='R12-N'||upper(trim(RutaHistoricaId))=='RH-12-N','RH-12-N',iif(upper(trim(RutaHistoricaId))=='R12-S'||upper(trim(RutaHistoricaId))=='RH-12-S','RH-12-S',iif(left(upper(trim(RutaHistoricaId)),3)=='RH-',upper(trim(RutaHistoricaId)),iif(lpad(regexReplace(trim(RutaHistoricaId),'[^0-9]',''),2,'0')=='12','RH-12-OLD',iif(lpad(regexReplace(trim(RutaHistoricaId),'[^0-9]',''),2,'0')=='07',iif(FechaServicio>=toDate('2024-01-01','yyyy-MM-dd'),'RH-07-NEW','RH-07'),concat('RH-',lpad(regexReplace(trim(RutaHistoricaId),'[^0-9]',''),2,'0'))))))),",
+				"          VehiculoId = iif(lpad(regexReplace(trim(VehiculoId),'[^0-9]',''),3,'0')=='043' && FechaServicio<toDate('2024-01-01','yyyy-MM-dd'), 'V-043-OLD', concat('V-', lpad(regexReplace(trim(VehiculoId),'[^0-9]',''),3,'0')))) ~> normalizarIds",
+				"normalizarIds window(over(ViajeId),",
+				"     asc(AnioFuente, true),",
+				"     rn = rowNumber()) ~> numerarDuplicados",
+				"numerarDuplicados filter(rn == 1) ~> filtrarUnico",
+				"filtrarUnico sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          ViajeId as string,",
+				"          RutaHistoricaId as string,",
+				"          VehiculoId as string,",
+				"          FechaServicio as date,",
+				"          HoraProgramada as timestamp,",
+				"          HoraSalida as timestamp,",
+				"          HoraLlegada as timestamp,",
+				"          ValidacionesTarjeta as integer,",
+				"          KmRecorridos as decimal(8,1),",
+				"          EstadoViaje as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          ViajeId,",
+				"          RutaHistoricaId,",
+				"          VehiculoId,",
+				"          FechaServicio,",
+				"          HoraProgramada,",
+				"          HoraSalida,",
+				"          HoraLlegada,",
+				"          ValidacionesTarjeta,",
+				"          KmRecorridos,",
+				"          EstadoViaje",
+				"     )) ~> silverViajes"
 			]
 		}
 	}

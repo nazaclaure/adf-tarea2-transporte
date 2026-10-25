@@ -46,6 +46,12 @@
 				},
 				{
 					"name": "select3"
+				},
+				{
+					"name": "union1"
+				},
+				{
+					"name": "unionConERP"
 				}
 			],
 			"scriptLines": [
@@ -152,7 +158,9 @@
 				"          EstadoViaje = estado_viaje",
 				"     ),",
 				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true) ~> select3"
+				"     skipDuplicateMapOutputs: true) ~> select3",
+				"select1, select2, select3 union(byName: true)~> union1",
+				"union1, sql union(byName: true)~> unionConERP"
 			]
 		}
 	}

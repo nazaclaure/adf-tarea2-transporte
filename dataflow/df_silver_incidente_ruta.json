@@ -1,0 +1,80 @@
+{
+	"name": "df_silver_incidente_ruta",
+	"properties": {
+		"folder": {
+			"name": "silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_incidente_ruta_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_incidente_ruta_sql",
+						"type": "DatasetReference"
+					},
+					"name": "silverIncidenteRuta"
+				}
+			],
+			"transformations": [
+				{
+					"name": "limpiarCampos"
+				},
+				{
+					"name": "numerarDuplicados"
+				},
+				{
+					"name": "filtrarUnico"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          AnioFuente as string,",
+				"          IncidenteId as string,",
+				"          RutaHistoricaId as string,",
+				"          EsPrincipal as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source1 derive(IncidenteId = upper(trim(IncidenteId)),",
+				"          RutaHistoricaId = iif(upper(trim(RutaHistoricaId))=='RH-07-OLD', 'RH-07', upper(trim(RutaHistoricaId))),",
+				"          EsPrincipal = iif(upper(trim(EsPrincipal))=='1'||upper(trim(EsPrincipal))=='TRUE', true(), false())) ~> limpiarCampos",
+				"limpiarCampos window(over(IncidenteId,",
+				"          RutaHistoricaId),",
+				"     asc(AnioFuente, true),",
+				"     rn = rowNumber()) ~> numerarDuplicados",
+				"numerarDuplicados filter(rn == 1) ~> filtrarUnico",
+				"filtrarUnico sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          IncidenteId as string,",
+				"          RutaHistoricaId as string,",
+				"          EsPrincipal as boolean",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          IncidenteId,",
+				"          RutaHistoricaId,",
+				"          EsPrincipal",
+				"     )) ~> silverIncidenteRuta"
+			]
+		}
+	}
+}

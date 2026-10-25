@@ -15,13 +15,27 @@
 					"name": "source1"
 				}
 			],
-			"sinks": [],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_rutas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "silverRutas"
+				}
+			],
 			"transformations": [
 				{
 					"name": "normalizarIds"
 				},
 				{
 					"name": "convertirTipos"
+				},
+				{
+					"name": "numerarDuplicados"
+				},
+				{
+					"name": "filtrarUnico"
 				}
 			],
 			"scriptLines": [
@@ -47,7 +61,41 @@
 				"          NombreRuta = trim(NombreRuta),",
 				"          Origen = trim(Origen),",
 				"          Destino = trim(Destino),",
-				"          Estado = upper(trim(Estado))) ~> convertirTipos"
+				"          Estado = upper(trim(Estado))) ~> convertirTipos",
+				"convertirTipos window(over(RutaHistoricaId),",
+				"     asc(AnioFuente, true),",
+				"     rn = rowNumber()) ~> numerarDuplicados",
+				"numerarDuplicados filter(rn == 1) ~> filtrarUnico",
+				"filtrarUnico sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          RutaHistoricaId as string,",
+				"          CodigoRuta as string,",
+				"          NombreRuta as string,",
+				"          Origen as string,",
+				"          Destino as string,",
+				"          VigenciaDesde as date,",
+				"          VigenciaHasta as date,",
+				"          Estado as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          RutaHistoricaId,",
+				"          CodigoRuta,",
+				"          NombreRuta,",
+				"          Origen,",
+				"          Destino,",
+				"          VigenciaDesde,",
+				"          VigenciaHasta,",
+				"          Estado",
+				"     )) ~> silverRutas"
 			]
 		}
 	}

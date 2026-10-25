@@ -1,0 +1,106 @@
+{
+	"name": "df_silver_paradas",
+	"properties": {
+		"folder": {
+			"name": "silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_paradas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_paradas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "silverParadas"
+				}
+			],
+			"transformations": [
+				{
+					"name": "normalizarIds"
+				},
+				{
+					"name": "convertirTipos"
+				},
+				{
+					"name": "numerarDuplicados"
+				},
+				{
+					"name": "filtrarUnico"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          AnioFuente as string,",
+				"          ParadaHistoricaId as string,",
+				"          CodigoPublicado as string,",
+				"          NombreParada as string,",
+				"          Zona as string,",
+				"          Latitud as string,",
+				"          Longitud as string,",
+				"          VigenciaDesde as string,",
+				"          VigenciaHasta as string,",
+				"          Estado as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source1 derive(ParadaHistoricaId = iif(upper(trim(ParadaHistoricaId))=='MC-01', iif(upper(trim(Estado))=='REUBICADA','P220-MC-OLD','P220-MC-NEW'), upper(trim(ParadaHistoricaId))),",
+				"          CodigoPublicado = iif(isNull(CodigoPublicado)||trim(CodigoPublicado)=='', upper(trim(ParadaHistoricaId)), upper(trim(CodigoPublicado)))) ~> normalizarIds",
+				"normalizarIds derive(VigenciaDesde = iif(isNull(VigenciaDesde)||trim(VigenciaDesde)=='', toDate(null()), iif(instr(VigenciaDesde,'/')>0, toDate(trim(VigenciaDesde),'dd/MM/yyyy'), iif(instr(VigenciaDesde,'-')>0, toDate(substring(trim(VigenciaDesde),1,10),'yyyy-MM-dd'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(trim(VigenciaDesde)))))),",
+				"          VigenciaHasta = iif(isNull(VigenciaHasta)||trim(VigenciaHasta)=='', toDate(null()), iif(instr(VigenciaHasta,'/')>0, toDate(trim(VigenciaHasta),'dd/MM/yyyy'), iif(instr(VigenciaHasta,'-')>0, toDate(substring(trim(VigenciaHasta),1,10),'yyyy-MM-dd'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(trim(VigenciaHasta)))))),",
+				"          Latitud = toDecimal(round(toDouble(replace(trim(Latitud),',','.')),6),9,6),",
+				"          Longitud = toDecimal(round(toDouble(replace(trim(Longitud),',','.')),6),9,6),",
+				"          NombreParada = trim(NombreParada),",
+				"          Zona = trim(Zona),",
+				"          Estado = upper(trim(Estado))) ~> convertirTipos",
+				"convertirTipos window(over(ParadaHistoricaId),",
+				"     asc(AnioFuente, true),",
+				"     rn = rowNumber()) ~> numerarDuplicados",
+				"numerarDuplicados filter(rn == 1) ~> filtrarUnico",
+				"filtrarUnico sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          ParadaHistoricaId as string,",
+				"          CodigoPublicado as string,",
+				"          NombreParada as string,",
+				"          Zona as string,",
+				"          Latitud as decimal(9,6),",
+				"          Longitud as decimal(9,6),",
+				"          VigenciaDesde as date,",
+				"          VigenciaHasta as date,",
+				"          Estado as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          ParadaHistoricaId,",
+				"          CodigoPublicado,",
+				"          NombreParada,",
+				"          Zona,",
+				"          Latitud,",
+				"          Longitud,",
+				"          VigenciaDesde,",
+				"          VigenciaHasta,",
+				"          Estado",
+				"     )) ~> silverParadas"
+			]
+		}
+	}
+}

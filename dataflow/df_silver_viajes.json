@@ -36,6 +36,9 @@
 				},
 				{
 					"name": "filtrarUnico"
+				},
+				{
+					"name": "quitarTotales"
 				}
 			],
 			"scriptLines": [
@@ -56,7 +59,7 @@
 				"     validateSchema: false,",
 				"     isolationLevel: 'READ_UNCOMMITTED',",
 				"     format: 'table') ~> source1",
-				"source1 derive(FechaServicio = iif(isNull(FechaServicio)||trim(FechaServicio)=='', toDate(null()), iif(instr(FechaServicio,'/')>0, toDate(trim(FechaServicio),'dd/MM/yyyy'), iif(instr(FechaServicio,'-')>0, toDate(substring(trim(FechaServicio),1,10),'yyyy-MM-dd'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(trim(FechaServicio)))))),",
+				"quitarTotales derive(FechaServicio = iif(isNull(FechaServicio)||trim(FechaServicio)=='', toDate(null()), iif(instr(FechaServicio,'/')>0, toDate(trim(FechaServicio),'dd/MM/yyyy'), iif(instr(FechaServicio,'-')>0, toDate(substring(trim(FechaServicio),1,10),'yyyy-MM-dd'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(trim(FechaServicio)))))),",
 				"          HoraProgramada = toTimestamp(concat('1900-01-01 ', substring(iif(instr(HoraProgramada,'T')>0, substring(HoraProgramada, instr(HoraProgramada,'T')+1), iif(instr(HoraProgramada,' ')>0, substring(HoraProgramada, instr(HoraProgramada,' ')+1), trim(HoraProgramada))),1,5), ':00'), 'yyyy-MM-dd HH:mm:ss'),",
 				"          HoraSalida = toTimestamp(concat('1900-01-01 ', substring(iif(instr(HoraSalida,'T')>0, substring(HoraSalida, instr(HoraSalida,'T')+1), iif(instr(HoraSalida,' ')>0, substring(HoraSalida, instr(HoraSalida,' ')+1), trim(HoraSalida))),1,5), ':00'), 'yyyy-MM-dd HH:mm:ss'),",
 				"          HoraLlegada = toTimestamp(concat('1900-01-01 ', substring(iif(instr(HoraLlegada,'T')>0, substring(HoraLlegada, instr(HoraLlegada,'T')+1), iif(instr(HoraLlegada,' ')>0, substring(HoraLlegada, instr(HoraLlegada,' ')+1), trim(HoraLlegada))),1,5), ':00'), 'yyyy-MM-dd HH:mm:ss'),",
@@ -70,6 +73,7 @@
 				"     asc(AnioFuente, true),",
 				"     rn = rowNumber()) ~> numerarDuplicados",
 				"numerarDuplicados filter(rn == 1) ~> filtrarUnico",
+				"source1 filter(!isNull(ViajeId) && !isNull(FechaServicio) && left(upper(trim(ViajeId)),6) != 'TOTAL_') ~> quitarTotales",
 				"filtrarUnico sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",

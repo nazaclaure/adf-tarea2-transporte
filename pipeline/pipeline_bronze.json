@@ -1,0 +1,37 @@
+{
+	"name": "pipeline_bronze",
+	"properties": {
+		"activities": [
+			{
+				"name": "reiniciar_bronze",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "sql_dw_transporte",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": "TRUNCATE TABLE bronze.IncidenteRuta;\nTRUNCATE TABLE bronze.Incidentes;\nTRUNCATE TABLE bronze.DemandaParadas;\nTRUNCATE TABLE bronze.Viajes;\nTRUNCATE TABLE bronze.Vehiculos;\nTRUNCATE TABLE bronze.Paradas;\nTRUNCATE TABLE bronze.Rutas;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			}
+		],
+		"folder": {
+			"name": "bronze"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,54 @@
+{
+	"name": "df_silver_rutas",
+	"properties": {
+		"folder": {
+			"name": "silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_rutas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [],
+			"transformations": [
+				{
+					"name": "normalizarIds"
+				},
+				{
+					"name": "convertirTipos"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          AnioFuente as string,",
+				"          RutaHistoricaId as string,",
+				"          CodigoRuta as string,",
+				"          NombreRuta as string,",
+				"          Origen as string,",
+				"          Destino as string,",
+				"          VigenciaDesde as string,",
+				"          VigenciaHasta as string,",
+				"          Estado as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source1 derive(RutaHistoricaId = iif(upper(trim(RutaHistoricaId))=='R12-N','RH-12-N',iif(upper(trim(RutaHistoricaId))=='R12-S','RH-12-S',iif(left(upper(trim(RutaHistoricaId)),3)=='RH-',upper(trim(RutaHistoricaId)),iif(upper(trim(Estado))=='DIVIDIDA',concat('RH-',lpad(regexReplace(trim(RutaHistoricaId),'[^0-9]',''),2,'0'),'-OLD'),concat('RH-',lpad(regexReplace(trim(RutaHistoricaId),'[^0-9]',''),2,'0')))))),",
+				"          CodigoRuta = iif(isNull(CodigoRuta)||trim(CodigoRuta)=='',iif(upper(trim(RutaHistoricaId))=='R12-N','R12-N',iif(upper(trim(RutaHistoricaId))=='R12-S','R12-S',concat('R-',lpad(regexReplace(trim(RutaHistoricaId),'[^0-9]',''),2,'0')))),trim(CodigoRuta))) ~> normalizarIds",
+				"normalizarIds derive(VigenciaDesde = iif(isNull(VigenciaDesde)||trim(VigenciaDesde)=='', toDate(null()), iif(instr(VigenciaDesde,'/')>0, toDate(trim(VigenciaDesde),'dd/MM/yyyy'), iif(instr(VigenciaDesde,'-')>0, toDate(substring(trim(VigenciaDesde),1,10),'yyyy-MM-dd'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(trim(VigenciaDesde)))))),",
+				"          VigenciaHasta = iif(isNull(VigenciaHasta)||trim(VigenciaHasta)=='', toDate(null()), iif(instr(VigenciaHasta,'/')>0, toDate(trim(VigenciaHasta),'dd/MM/yyyy'), iif(instr(VigenciaHasta,'-')>0, toDate(substring(trim(VigenciaHasta),1,10),'yyyy-MM-dd'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(trim(VigenciaHasta)))))),",
+				"          NombreRuta = trim(NombreRuta),",
+				"          Origen = trim(Origen),",
+				"          Destino = trim(Destino),",
+				"          Estado = upper(trim(Estado))) ~> convertirTipos"
+			]
+		}
+	}
+}

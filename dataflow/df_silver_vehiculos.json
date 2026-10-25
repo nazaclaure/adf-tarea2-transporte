@@ -1,0 +1,63 @@
+{
+	"name": "df_silver_vehiculos",
+	"properties": {
+		"folder": {
+			"name": "silver"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_vehiculos_sql",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [],
+			"transformations": [
+				{
+					"name": "limpiarVehiculos"
+				},
+				{
+					"name": "separarVersiones"
+				},
+				{
+					"name": "numerarDuplicados"
+				},
+				{
+					"name": "filtrarUnico"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          AnioFuente as string,",
+				"          VehiculoId as string,",
+				"          Placa as string,",
+				"          TipoVehiculo as string,",
+				"          CapacidadEfectiva as string,",
+				"          VigenciaDesde as string,",
+				"          VigenciaHasta as string,",
+				"          Estado as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> source1",
+				"source1 derive(VehiculoId = iif(regexMatch(trim(VehiculoId),'^[0-9]+$'), concat('V-', lpad(trim(VehiculoId),3,'0')), upper(trim(VehiculoId))),",
+				"          Placa = upper(trim(Placa)),",
+				"          TipoVehiculo = upper(trim(TipoVehiculo)),",
+				"          CapacidadEfectiva = toInteger(toDouble(replace(trim(CapacidadEfectiva),',','.'))),",
+				"          VigenciaDesde = iif(isNull(VigenciaDesde)||trim(VigenciaDesde)=='', toDate(null()), iif(instr(VigenciaDesde,'/')>0, toDate(trim(VigenciaDesde),'dd/MM/yyyy'), iif(instr(VigenciaDesde,'-')>0, toDate(substring(trim(VigenciaDesde),1,10),'yyyy-MM-dd'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(trim(VigenciaDesde)))))),",
+				"          VigenciaHasta = iif(isNull(VigenciaHasta)||trim(VigenciaHasta)=='', toDate(null()), iif(instr(VigenciaHasta,'/')>0, toDate(trim(VigenciaHasta),'dd/MM/yyyy'), iif(instr(VigenciaHasta,'-')>0, toDate(substring(trim(VigenciaHasta),1,10),'yyyy-MM-dd'), addDays(toDate('1899-12-30','yyyy-MM-dd'), toInteger(trim(VigenciaHasta)))))),",
+				"          Estado = upper(trim(Estado))) ~> limpiarVehiculos",
+				"limpiarVehiculos derive(VehiculoId = iif(VigenciaHasta < toDate('2024-01-01','yyyy-MM-dd'), concat(VehiculoId,'-OLD'), VehiculoId)) ~> separarVersiones",
+				"separarVersiones window(over(VehiculoId),",
+				"     asc(AnioFuente, true),",
+				"     rn = rowNumber()) ~> numerarDuplicados",
+				"numerarDuplicados filter(rn == 1) ~> filtrarUnico"
+			]
+		}
+	}
+}

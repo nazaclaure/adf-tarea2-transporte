@@ -36,7 +36,15 @@
 					"name": "xls2023"
 				}
 			],
-			"sinks": [],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_bronze_rutas_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
 			"transformations": [
 				{
 					"name": "select1"
@@ -46,6 +54,12 @@
 				},
 				{
 					"name": "select3"
+				},
+				{
+					"name": "union1"
+				},
+				{
+					"name": "unionConERP"
 				}
 			],
 			"scriptLines": [
@@ -132,7 +146,41 @@
 				"          Estado = estado",
 				"     ),",
 				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true) ~> select3"
+				"     skipDuplicateMapOutputs: true) ~> select3",
+				"select1, select2, select3 union(byName: true)~> union1",
+				"union1, sql union(byName: true)~> unionConERP",
+				"unionConERP sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          AnioFuente as string,",
+				"          RutaHistoricaId as string,",
+				"          CodigoRuta as string,",
+				"          NombreRuta as string,",
+				"          Origen as string,",
+				"          Destino as string,",
+				"          VigenciaDesde as string,",
+				"          VigenciaHasta as string,",
+				"          Estado as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          AnioFuente,",
+				"          RutaHistoricaId,",
+				"          CodigoRuta,",
+				"          NombreRuta,",
+				"          Origen,",
+				"          Destino,",
+				"          VigenciaDesde,",
+				"          VigenciaHasta,",
+				"          Estado",
+				"     )) ~> sink1"
 			]
 		}
 	}

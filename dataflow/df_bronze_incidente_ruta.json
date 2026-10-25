@@ -49,6 +49,21 @@
 				},
 				{
 					"name": "unionCsvExcel"
+				},
+				{
+					"name": "separarRutas"
+				},
+				{
+					"name": "aplanarRutas"
+				},
+				{
+					"name": "calcularPrincipal"
+				},
+				{
+					"name": "select4"
+				},
+				{
+					"name": "unionConERP"
 				}
 			],
 			"scriptLines": [
@@ -128,7 +143,26 @@
 				"     ),",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true) ~> select3",
-				"select1, select2, select3 union(byName: true)~> unionCsvExcel"
+				"select1, select2, select3 union(byName: true)~> unionCsvExcel",
+				"unionCsvExcel derive(ListaRutas = split(rutas_afectadas,'|'),",
+				"          RutaPrincipal = split(rutas_afectadas,'|')[1]) ~> separarRutas",
+				"separarRutas foldDown(unroll(ListaRutas, ListaRutas),",
+				"     mapColumn(",
+				"          IncidenteId,",
+				"          RutaHistoricaId = ListaRutas,",
+				"          RutaPrincipal",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> aplanarRutas",
+				"aplanarRutas derive(EsPrincipal = iif(RutaHistoricaId == RutaPrincipal, '1', '0')) ~> calcularPrincipal",
+				"calcularPrincipal select(mapColumn(",
+				"          IncidenteId,",
+				"          RutaHistoricaId,",
+				"          EsPrincipal",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select4",
+				"select4, sql union(byName: true)~> unionConERP"
 			]
 		}
 	}

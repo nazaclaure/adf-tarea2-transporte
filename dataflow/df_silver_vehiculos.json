@@ -15,7 +15,15 @@
 					"name": "source1"
 				}
 			],
-			"sinks": [],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "dw_silver_vehiculos_sql",
+						"type": "DatasetReference"
+					},
+					"name": "silverVehiculos"
+				}
+			],
 			"transformations": [
 				{
 					"name": "limpiarVehiculos"
@@ -56,7 +64,35 @@
 				"separarVersiones window(over(VehiculoId),",
 				"     asc(AnioFuente, true),",
 				"     rn = rowNumber()) ~> numerarDuplicados",
-				"numerarDuplicados filter(rn == 1) ~> filtrarUnico"
+				"numerarDuplicados filter(rn == 1) ~> filtrarUnico",
+				"filtrarUnico sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          VehiculoId as string,",
+				"          Placa as string,",
+				"          TipoVehiculo as string,",
+				"          CapacidadEfectiva as integer,",
+				"          VigenciaDesde as date,",
+				"          VigenciaHasta as date,",
+				"          Estado as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          VehiculoId,",
+				"          Placa,",
+				"          TipoVehiculo,",
+				"          CapacidadEfectiva,",
+				"          VigenciaDesde,",
+				"          VigenciaHasta,",
+				"          Estado",
+				"     )) ~> silverVehiculos"
 			]
 		}
 	}
